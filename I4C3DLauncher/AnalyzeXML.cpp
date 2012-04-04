@@ -1,11 +1,16 @@
 #include "StdAfx.h"
 #include "I4C3DLauncher.h"
 #include "AnalyzeXML.h"
-#include "Miscellaneous.h"
 #include "XMLParser.h"
 #include <vector>
 
-extern TCHAR szTitle[MAX_LOADSTRING];
+#if UNICODE || _UNICODE
+static LPCTSTR g_FILE = __FILEW__;
+#else
+static LPCTSTR g_FILE = __FILE__;
+#endif
+
+extern TCHAR szTitle[];
 
 static IXMLDOMElement* g_pRootElement = NULL;
 static BOOL g_bInitialized = FALSE;
@@ -87,17 +92,15 @@ void CleanupRootElement(void)
  * 
  * XMLParser.dllを利用し、XMLをロードしオブジェクトにします。
  */
-BOOL AnalyzeXML::LoadXML(PCTSTR szXMLUri)
+BOOL AnalyzeXML::LoadXML(PCTSTR szXMLUri, BOOL* bFileExist)
 {
 	CleanupRootElement();
 	if (!PathFileExists(szXMLUri)) {
-		{
-			TCHAR szError[BUFFER_SIZE];
-			_stprintf_s(szError, _countof(szError), _T("指定したパスに設定ファイルが存在しません[%s]。<AnalyzeXML::LoadXML>"), szXMLUri);
-			LogDebugMessage(Log_Error, szError);
-		}
+		LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_LOAD), GetLastError(), g_FILE, __LINE__);
+		*bFileExist = FALSE;
 		return FALSE;
 	}
+	*bFileExist = TRUE;
 	g_bInitialized = Initialize(&g_pRootElement, szXMLUri);
 	return g_bInitialized;
 }
@@ -120,7 +123,7 @@ BOOL AnalyzeXML::LoadXML(PCTSTR szXMLUri)
 PCTSTR AnalyzeXML::GetGlobalValue(PCTSTR szKey)
 {
 	if (!ReadGlobalTag()) {
-		ReportError(_T("[ERROR] globalタグの読み込みに失敗しています。"));
+		LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_GLOBAL), GetLastError(), g_FILE, __LINE__);
 		return NULL;
 	}
 
@@ -149,7 +152,7 @@ PCTSTR AnalyzeXML::GetSoftValue(PCTSTR szSoftName, PCTSTR szKey)
 	//	return NULL;
 	//}
 	if (!this->ReadSoftsTag()) {
-		ReportError(_T("[ERROR] softsタグの読み込みに失敗しています。"));
+		LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_SOFTS), GetLastError(), g_FILE, __LINE__);
 		return NULL;
 	}
 
@@ -218,7 +221,7 @@ BOOL AnalyzeXML::ReadSoftsTag(void)
 		IXMLDOMNode* pSofts = NULL;
 		IXMLDOMNodeList* pSoftsList = NULL;
 		if (!GetDOMTree(g_pRootElement, TAG_SOFTS, &pSofts)) {
-			LogDebugMessage(Log_Error, _T("softsタグのDOM取得に失敗しています。<AnalyzeXML::ReadSoftsTag>"));
+			LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_SOFTS_DOM), GetLastError(), g_FILE, __LINE__);
 			return FALSE;
 		}
 

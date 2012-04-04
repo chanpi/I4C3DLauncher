@@ -8,7 +8,7 @@ public:
 	~AnalyzeXML(void);
 
 	// 引数つきコンストラクタを呼ばない場合は、別途呼び出すことができます。
-	BOOL LoadXML(PCTSTR szXMLUri);
+	BOOL LoadXML(PCTSTR szXMLUri, BOOL* bFileExist);
 
 	PCTSTR GetGlobalValue(PCTSTR szKey);
 	PCTSTR GetSoftValue(PCTSTR szSoftName, PCTSTR szKey);

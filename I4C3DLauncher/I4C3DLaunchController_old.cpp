@@ -25,8 +25,8 @@ namespace {
 	// プロセス終了を識別するイベント
 	static HANDLE g_hStopEvent = INVALID_HANDLE_VALUE;
 
-	// RTTECモードで起動するか
-	BOOL g_bRTTECMode = FALSE;
+	// RTT4ECモードで起動するか
+	BOOL g_bRTT4ECMode = FALSE;
 	// コアアプリケーション名
 	LPCTSTR g_szCoreAppName = NULL;
 
@@ -36,10 +36,10 @@ namespace {
 	static map<int, tstring> g_ErrorMessageMap;
 
 	const PCTSTR TAG_CORE_APP_NAME	= _T("core_app_name");
-	const PCTSTR TAG_RTTEC_MODE		= _T("rttec_mode");
+	const PCTSTR TAG_RTT4EC_MODE	= _T("rtt4ec_mode");
 	const PCTSTR TAG_TIME_TO_WAIT	= _T("time_to_wait");
-	const PCTSTR RTTEC_STRING		= _T("rttec");
-	const tstring CRNL				= _T("\r\n");
+	const PCTSTR RTT4EC_STRING		= _T("rtt4ec");
+	const tstring CRNL = _T("\r\n");
 	const UINT g_uErrorDialogType = MB_OK | MB_ICONERROR | MB_TOPMOST;
 
 	static BOOL g_bXMLFileError = FALSE;
@@ -97,9 +97,9 @@ BOOL Initialize(HWND hWnd)
 	SetDlgItemText(g_hDlg, IDC_EDIT1, g_statusString.c_str());
 	InvalidateRect(g_hDlg, NULL, FALSE);
 
-	// RTTECモードか確認
-	if (!_tcsicmp(g_analyzer.GetGlobalValue(TAG_RTTEC_MODE), _T("on"))) {
-		g_bRTTECMode = TRUE;
+	// RTT4ECモードか確認
+	if (!_tcsicmp(g_analyzer.GetGlobalValue(TAG_RTT4EC_MODE), _T("on"))) {
+		g_bRTT4ECMode = TRUE;
 	}
 	// コアアプリケーション名を確認(コアは確実に起動する必要がある)
 	g_szCoreAppName = g_analyzer.GetGlobalValue(TAG_CORE_APP_NAME);
@@ -194,8 +194,8 @@ VOID CreateErrorMessageMap(VOID)
 	LoadString(hInst, IDS_EXIT_GAMEPAD_SETUP_ERROR, szMessage, _countof(szMessage));
 	g_ErrorMessageMap[EXIT_GAMEPAD_SETUP_ERROR] = szMessage;
 
-	LoadString(hInst, IDS_EXIT_RTTEC_CONNECT_ERROR, szMessage, _countof(szMessage));
-	g_ErrorMessageMap[EXIT_RTTEC_CONNECT_ERROR] = szMessage;
+	LoadString(hInst, IDS_EXIT_RTT4EC_CONNECT_ERROR, szMessage, _countof(szMessage));
+	g_ErrorMessageMap[EXIT_RTT4EC_CONNECT_ERROR] = szMessage;
 
 	LoadString(hInst, IDS_EXIT_CORE_CONNECT_ERROR, szMessage, _countof(szMessage));
 	g_ErrorMessageMap[EXIT_CORE_CONNECT_ERROR] = szMessage;
@@ -221,37 +221,29 @@ VOID CloseProcess(LPCTSTR szApplicationName, HANDLE hProcess, DWORD dwProcessId)
 	}
 
 	// プロセス情報が与えられていれば、プロセスが終了しているか確認
-	if (hProcess != NULL && hProcess != INVALID_HANDLE_VALUE) {
+	if (hProcess != NULL || hProcess != INVALID_HANDLE_VALUE) {
 		GetExitCodeProcess(hProcess, &dwExitCode);
-		if (dwExitCode != STILL_ACTIVE) {
-			return;
-		}
-	}
+		if (dwExitCode == STILL_ACTIVE) {
+			// taskkillを試す
+			for (int i = 0; i < 5; i++) {
+				ShellExecute(NULL, _T("open"), _T("taskkill"), tstring(_T("/IM ")).append(szAppTitleWithExtension).c_str(), NULL, SW_HIDE);
+			}
 
-	// taskkillを試す
-	for (int i = 0; i < 5; i++) {
-		ShellExecute(NULL, _T("open"), _T("taskkill"), tstring(_T("/IM ")).append(szAppTitleWithExtension).c_str(), NULL, SW_HIDE);
-	}
-
-	// プロセス情報が与えられていれば、プロセスが終了しているか確認
-	if (hProcess != NULL && hProcess != INVALID_HANDLE_VALUE) {
-		GetExitCodeProcess(hProcess, &dwExitCode);
-		if (dwExitCode != STILL_ACTIVE) {
-			return;
-		}
-	}
-
-	// プロセスIDが与えられているならtaskkill pid xxxx、与えられていなければTerminatePorcess
-	if (dwProcessId > 0) {
-		TCHAR szPID[8];
-		_stprintf_s(szPID, _countof(szPID), _T("%d"), dwProcessId);
-		for (int i = 0; i < 5; i++) {
-			ShellExecute(NULL, _T("open"), _T("taskkill"), tstring(_T("/pid ")).append(szPID).c_str(), NULL, SW_HIDE);
-		}
-	}
-	if (hProcess) {
-		for (int i = 0; i < 5; i++) {
-			TerminateProcess(hProcess, EXIT_SUCCESS);
+			GetExitCodeProcess(hProcess, &dwExitCode);
+			if (dwExitCode == STILL_ACTIVE) {
+				// プロセスIDが与えられているならtaskkill pid xxxx、与えられていなければTerminatePorcess
+				if (dwProcessId > 0) {
+					TCHAR szPID[8];
+					_stprintf_s(szPID, _countof(szPID), _T("%d"), dwProcessId);
+					for (int i = 0; i < 5; i++) {
+						ShellExecute(NULL, _T("open"), _T("taskkill"), tstring(_T("/pid ")).append(szPID).c_str(), NULL, SW_HIDE);
+					}
+				} else {
+					for (int i = 0; i < 5; i++) {
+						TerminateProcess(hProcess, EXIT_SUCCESS);
+					}
+				}
+			}
 		}
 	}
 }
@@ -291,16 +283,16 @@ unsigned int __stdcall LaunchApplicationsProc(void *pParam)
 	UINT uThreadId;
 	vector<pair<tstring, tstring>>::iterator it = g_context.targetList.begin();
 	LPTSTR szCommandLine;
-	LPCTSTR szContainsRTTEC = NULL;
+	LPCTSTR szContainsRTT4EC = NULL;
 	LPCTSTR szContainsCoreApp = NULL;
 
 	EnterCriticalSection(&g_lock);
 	for (; it != g_context.targetList.end(); it++) {
 		// 該当するプラグイン以外は起動しない
-		szContainsRTTEC = _tcsstr(it->first.c_str(), RTTEC_STRING);
+		szContainsRTT4EC = _tcsstr(it->first.c_str(), RTT4EC_STRING);
 		szContainsCoreApp = _tcsstr(it->first.c_str(), g_szCoreAppName);
 		if (!szContainsCoreApp) {
-			if ((g_bRTTECMode && !szContainsRTTEC) || (!g_bRTTECMode && szContainsRTTEC)) {
+			if ((g_bRTT4ECMode && !szContainsRTT4EC) || (!g_bRTT4ECMode && szContainsRTT4EC)) {
 				continue;
 			}
 		}

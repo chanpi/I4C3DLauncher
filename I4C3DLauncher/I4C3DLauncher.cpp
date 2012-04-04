@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "I4C3DLauncher.h"
 #include "I4C3DLaunchController.h"
+#include "AnalyzeXML.h"
 
 #include <cstdlib>	// 必要
 
@@ -12,6 +13,12 @@
 #include <crtdbg.h>
 
 #define new  ::new( _NORMAL_BLOCK, __FILE__, __LINE__ )
+#endif
+
+#if UNICODE || _UNICODE
+static LPCTSTR g_FILE = __FILEW__;
+#else
+static LPCTSTR g_FILE = __FILE__;
 #endif
 
 #define MY_NOTIFYICON	(WM_APP+1)
@@ -40,10 +47,9 @@ namespace {
 
 	// 稼動時にログダイアログを表示する
 	static BOOL g_noDialog = FALSE;
-}
 
-// 設定ファイル
-LPCTSTR g_szConfigurationFileName = _T("I4C3D.xml");
+	static LPCTSTR g_szNoDialogOption	= _T("-nodialog");
+}
 
 I4C3DLauncherContext g_context = {0};
 AnalyzeXML g_analyzer;
@@ -56,8 +62,6 @@ CRITICAL_SECTION g_dialogLock;
 HWND g_hDlg = NULL;
 // ログダイアログに表示するテキスト
 tstring g_statusString = _T("");
-// プログラム起動に失敗したか
-volatile BOOL g_bLaunchFailed = FALSE;
 
 HANDLE g_hLauchApplicationThread = INVALID_HANDLE_VALUE;
 
@@ -91,7 +95,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	LPTSTR *argv = NULL;
 	argv = CommandLineToArgvW(GetCommandLine(), &argc);
 	if (argc > 1) {
-		if (0 == _tcsicmp(argv[1], _T("-nodialog"))) {
+		if (0 == _tcsicmp(argv[1], g_szNoDialogOption)) {
 			g_noDialog = TRUE;
 		}
 	}
@@ -103,8 +107,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 #else
 	logLevel = Log_Error;
 #endif
-	if (!LogFileOpenW("I4C3DLauncher", logLevel)) {
-		//ReportError(_T("I4C3DLauncherのログは出力されません。"));
+	if (!LogFileOpenW(SHARED_LOG_FILE_NAME, logLevel)) {
 	}
 
 	// クリティカルセクションの初期化
@@ -157,19 +160,19 @@ inline void SetTaskTrayIcon(HWND hWnd) {
 	menuItem_edit.cbSize		= sizeof(menuItem_edit);
 	menuItem_edit.fMask			= MIIM_STRING | MIIM_ID;
 	menuItem_edit.wID			= EDIT_MENU;
-	menuItem_edit.dwTypeData	= _T("設定ファイルを編集");
+	menuItem_edit.dwTypeData	= _T(MENU_EDIT);
 	menuItem_edit.cch			= _tcslen(menuItem_edit.dwTypeData);
 
 	menuItem_reload.cbSize		= sizeof(menuItem_reload);
 	menuItem_reload.fMask		= MIIM_STRING | MIIM_ID;
 	menuItem_reload.wID			= RELOAD_MENU;
-	menuItem_reload.dwTypeData	= _T("リロード");
+	menuItem_reload.dwTypeData	= _T(MENU_RELOAD);
 	menuItem_reload.cch			= _tcslen(menuItem_reload.dwTypeData);
 
 	menuItem_exit.cbSize		= sizeof(menuItem_exit);
 	menuItem_exit.fMask			= MIIM_STRING | MIIM_ID;
 	menuItem_exit.wID			= EXIT_MENU;
-	menuItem_exit.dwTypeData	= _T("終了");
+	menuItem_exit.dwTypeData	= _T(MENU_END);
 	menuItem_exit.cch			= _tcslen(menuItem_exit.dwTypeData);
 
 	GetCursorPos(&pos);
@@ -226,7 +229,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        この関数で、グローバル変数でインスタンス ハンドルを保存し、
 //        メイン プログラム ウィンドウを作成および表示します。
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+BOOL InitInstance(HINSTANCE hInstance, int /*nCmdShow*/)
 {
    HWND hWnd;
 
@@ -280,7 +283,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		// モジュール名を取得（）
 		if (!GetModuleFileName(NULL, szFileName, _countof(szFileName))) {
-			LogDebugMessage(Log_Error, _T("実行モジュール名の取得に失敗しました。終了します。"));
+			LoggingMessage(Log_Error, _T(MESSAGE_ERROR_SYSTEM_INIT), GetLastError(), g_FILE, __LINE__);
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			return 0;
 		}
@@ -311,7 +314,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DestroyWindow(hWnd);
 			break;
 		case EDIT_MENU:
-			ShellExecute(NULL, _T("open"), _T("notepad.exe"), g_szConfigurationFileName, NULL, SW_SHOW);
+			ShellExecute(NULL, _T("open"), _T("notepad.exe"), SHARED_XML_FILE, NULL, SW_SHOW);
 			break;
 		case RELOAD_MENU:
 			// TODO Stop
@@ -331,6 +334,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				g_hDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hWnd, (DLGPROC)DlgProc);
 			}
 			ShowWindow(g_hDlg, SW_SHOW);
+			SetForegroundWindow(g_hDlg);
 			break;
 
 		case WM_RBUTTONDOWN:
@@ -339,14 +343,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 
-	case MY_LAUNCHFAILED:
-		PostMessage(hWnd, WM_CLOSE, 0, 0);
-		break;
-
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		// TODO: 描画コードをここに追加してください...
 		EndPaint(hWnd, &ps);
+		break;
+
+	case MY_LAUNCHFAILED:
+		ExitLauncher();
+		if (g_hLauchApplicationThread != INVALID_HANDLE_VALUE) {
+			WaitForSingleObject(g_hLauchApplicationThread, INFINITE);
+			CloseHandle(g_hLauchApplicationThread);
+			g_hLauchApplicationThread = INVALID_HANDLE_VALUE;
+		}
 		break;
 
 	case WM_CLOSE:
@@ -356,11 +365,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			WaitForSingleObject(g_hLauchApplicationThread, INFINITE);
 			CloseHandle(g_hLauchApplicationThread);
 			g_hLauchApplicationThread = INVALID_HANDLE_VALUE;
-		}
-
-		if (g_bLaunchFailed) {
-			MessageBox(hWnd, _T("プログラムは正常に起動されませんでした。"), szTitle, MB_OK | MB_ICONERROR | MB_TOPMOST);
-			g_bLaunchFailed = FALSE;
 		}
 
 		UnInitialize();
@@ -381,10 +385,19 @@ LRESULT CALLBACK DlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
 
+	HICON hIcon;
 	switch (message)
 	{
 	case WM_INITDIALOG:
+		hIcon = (HICON)LoadImage(hInst,
+			MAKEINTRESOURCE(IDI_SMALL),
+            IMAGE_ICON,
+            GetSystemMetrics(SM_CXSMICON),
+            GetSystemMetrics(SM_CYSMICON),
+            0);
+		SendMessage(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
 		SetDlgItemText(hDlg, IDC_EDIT1, g_statusString.c_str());
+		SetForegroundWindow(hDlg);
 		return (LRESULT)TRUE;
 
 	case WM_COMMAND:
@@ -397,12 +410,21 @@ LRESULT CALLBACK DlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			EndDialog(hDlg, LOWORD(wParam));
 			g_hDlg = NULL;
 			break;
+
+		case IDM_ABOUT:
+			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hDlg, About);
+			break;
+
+		case IDM_EXIT:
+			PostMessage(hDlg, WM_CLOSE, 0, 0);
+			break;
 		}
 		return (LRESULT)TRUE;
 
 	case WM_CLOSE:
 		EndDialog(hDlg, LOWORD(wParam));
 		g_hDlg = NULL;
+		PostMessage(g_hWnd, WM_CLOSE, 0, 0);
 		return (LRESULT)TRUE;
 	}
 	return (LRESULT)FALSE;
