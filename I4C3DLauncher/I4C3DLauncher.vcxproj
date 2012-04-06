@@ -80,6 +80,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="hamster.bmp" />
+    <None Include="hamster.png" />
     <None Include="I4C3DLauncher.ico" />
     <None Include="ReadMe.txt" />
     <None Include="small.ico" />

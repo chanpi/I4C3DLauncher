@@ -20,6 +20,12 @@
 #define EXIT_RTTEC_CONNECT_ERROR		240	// RTTが起動されていないか、External Connectionが使用できない
 #define EXIT_CORE_CONNECT_ERROR			250	// I4C3Dが起動されていない
 
+#define EXIT_CERT_UNINITIALIZED			260	// ライセンスチェックが行われていない
+#define EXIT_CERT_INVALID_MACADDRESS	261	// MACアドレスが無効
+#define EXIT_CERT_INVALID_EXPIRE_DATE	262	// 有効期限が無効
+#define EXIT_CERT_FILE_NOT_FOUND		263	// ライセンスファイルが見つからない
+#define EXIT_CERT_SYSTEM_ERROR			264	// ライセンスファイルチェック中にシステムエラーが発生
+
 #define EXIT_NOT_EXECUTABLE				998	// ランチャーから起動されるときに付与される起動オプションがない
 #define EXIT_SOME_ERROR					999	// 上記以外
 
@@ -81,6 +87,8 @@
 #define MESSAGE_ERROR_DI8_INVALID		"DirectInputの初期化に失敗しました。DirectXのバージョンを確認してください。デバイスが有効な状態か確認してください。"
 #define MESSAGE_ERROR_DI8_UNKNOWN		"DirectInputの処理中にエラーが発生しました。DirectXのバージョンを確認してください。デバイスが有効な状態か確認してください。"
 
-#define MESSAGE_ERROR_UNKNOWN			"やばぴ。"
+#define MESSAGE_ERROR_CERT_FAILED		"ライセンス認証に失敗しました。"
+
+#define MESSAGE_ERROR_UNKNOWN			"予期せぬエラーが発生。"
 
 #endif /* __SHARED_CONSTANTS__ */

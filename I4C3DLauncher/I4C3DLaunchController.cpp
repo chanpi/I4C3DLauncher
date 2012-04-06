@@ -39,7 +39,6 @@ namespace {
 	const PCTSTR TAG_RTTEC_MODE		= _T("rttec_mode");
 	const PCTSTR TAG_TIME_TO_WAIT	= _T("time_to_wait");
 	const PCTSTR RTTEC_STRING		= _T("rttec");
-	const tstring CRNL				= _T("\r\n");
 	const UINT g_uErrorDialogType = MB_OK | MB_ICONERROR | MB_TOPMOST;
 
 	static BOOL g_bXMLFileError = FALSE;
@@ -55,10 +54,8 @@ extern CRITICAL_SECTION g_dialogLock;
 
 extern HINSTANCE hInst;
 extern HWND g_hWnd;
-// ログウィンドウ
+// ダイアログウィンドウ
 extern HWND g_hDlg;
-// ログダイアログに表示するテキスト
-extern tstring g_statusString;
 
 extern HANDLE g_hLauchApplicationThread;
 
@@ -93,9 +90,6 @@ BOOL Initialize(HWND hWnd)
 	g_context.pAnalyzer = &g_analyzer;
 
 	g_nTimeToWait = _tstoi(g_analyzer.GetSoftValue(szTitle, TAG_TIME_TO_WAIT));
-	g_statusString.append(_T("起動準備中........\r\n"));
-	SetDlgItemText(g_hDlg, IDC_EDIT1, g_statusString.c_str());
-	InvalidateRect(g_hDlg, NULL, FALSE);
 
 	// RTTECモードか確認
 	if (!_tcsicmp(g_analyzer.GetGlobalValue(TAG_RTTEC_MODE), _T("on"))) {
@@ -199,6 +193,18 @@ VOID CreateErrorMessageMap(VOID)
 
 	LoadString(hInst, IDS_EXIT_CORE_CONNECT_ERROR, szMessage, _countof(szMessage));
 	g_ErrorMessageMap[EXIT_CORE_CONNECT_ERROR] = szMessage;
+
+	// ライセンス系
+	LoadString(hInst, IDS_EXIT_CERT_UNINITIALIZED, szMessage, _countof(szMessage));
+	g_ErrorMessageMap[EXIT_CERT_UNINITIALIZED] = szMessage;
+	LoadString(hInst, IDS_EXIT_CERT_INVALID_MACADDRESS, szMessage, _countof(szMessage));
+	g_ErrorMessageMap[EXIT_CERT_INVALID_MACADDRESS] = szMessage;
+	LoadString(hInst, IDS_EXIT_CERT_INVALID_EXPIRE_DATE, szMessage, _countof(szMessage));
+	g_ErrorMessageMap[EXIT_CERT_INVALID_EXPIRE_DATE] = szMessage;
+	LoadString(hInst, IDS_EXIT_CERT_FILE_NOT_FOUND, szMessage, _countof(szMessage));
+	g_ErrorMessageMap[EXIT_CERT_FILE_NOT_FOUND] = szMessage;
+	LoadString(hInst, IDS_EXIT_CERT_SYSTEM_ERROR, szMessage, _countof(szMessage));
+	g_ErrorMessageMap[EXIT_CERT_SYSTEM_ERROR] = szMessage;
 
 	LoadString(hInst, IDS_EXIT_NOT_EXECUTABLE, szMessage, _countof(szMessage));
 	g_ErrorMessageMap[EXIT_NOT_EXECUTABLE] = szMessage;
@@ -339,27 +345,19 @@ unsigned int __stdcall LaunchProgramThreadProc(void *pParam)
 		_tcscpy_s(szApplicationName, _countof(szApplicationName), szCommandLine);
 	}
 	szDialogMessage = szApplicationName;
+	szDialogMessage.append(_T(": "));
 
 	if (!PathFileExists(szApplicationName)) {
 		PostMessage(g_hWnd, MY_LAUNCHFAILED, 0, 0);
-		szDialogMessage.append(_T("を起動できませんでした。"));
 		szDialogMessage.append(g_ErrorMessageMap[EXIT_FILE_NOT_FOUND]);
 		LoggingMessage(Log_Error, szDialogMessage.c_str(), GetLastError(), g_FILE, __LINE__);
-		MessageBox(g_hWnd, szDialogMessage.c_str(), szTitle, g_uErrorDialogType);
+		MessageBox(g_hWnd, g_ErrorMessageMap[EXIT_FILE_NOT_FOUND].c_str(), szTitle, g_uErrorDialogType);
 		PostMessage(g_hWnd, WM_CLOSE, 0, 0);
 		delete pParam;
 		return EXIT_FAILURE;
 	}
 
 	isCreateProcessSucceeded = CreateProcess(NULL, szCommandLine, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
-
-	EnterCriticalSection(&g_dialogLock);
-	g_statusString.append(szApplicationName);
-	g_statusString.append(_T("を起動しています........\r\n"));
-	LeaveCriticalSection(&g_dialogLock);
-
-	SetDlgItemText(g_hDlg, IDC_EDIT1, g_statusString.c_str());
-	InvalidateRect(g_hDlg, NULL, FALSE);
 
 	CloseHandle(pi.hThread);
 
@@ -378,18 +376,9 @@ unsigned int __stdcall LaunchProgramThreadProc(void *pParam)
 		PostMessage(g_hWnd, MY_LAUNCHFAILED, 0, 0);
 
 		// すべてのプログラムの実行を中止
-		szDialogMessage.append(_T("を起動できませんでした。"));
 		szDialogMessage.append(_T(MESSAGE_ERROR_SYSTEM_INIT));
 		LoggingMessage(Log_Error, szDialogMessage.c_str(), GetLastError(), g_FILE, __LINE__);
-		MessageBox(g_hWnd, szDialogMessage.c_str(), szTitle, g_uErrorDialogType);
-		szDialogMessage.append(CRNL);
-
-		EnterCriticalSection(&g_dialogLock);
-		g_statusString.append(szDialogMessage);
-		SetDlgItemText(g_hDlg, IDC_EDIT1, g_statusString.c_str());
-		LeaveCriticalSection(&g_dialogLock);
-
-		InvalidateRect(g_hDlg, NULL, FALSE);
+		MessageBox(g_hWnd, _T(MESSAGE_ERROR_SYSTEM_INIT), szTitle, g_uErrorDialogType);
 
 		PostMessage(g_hWnd, WM_CLOSE, 0, 0);
 
@@ -402,18 +391,9 @@ unsigned int __stdcall LaunchProgramThreadProc(void *pParam)
 		}
 
 		// すべてのプログラムの実行を中止
-		szDialogMessage.append(_T("にエラーが発生しました。"));
 		szDialogMessage.append(szErrorMessage);
 		LoggingMessage(Log_Error, szDialogMessage.c_str(), GetLastError(), g_FILE, __LINE__);
-		MessageBox(g_hWnd, szDialogMessage.c_str(), szTitle, g_uErrorDialogType);
-		szDialogMessage.append(CRNL);
-
-		EnterCriticalSection(&g_dialogLock);
-		g_statusString.append(szDialogMessage);
-		SetDlgItemText(g_hDlg, IDC_EDIT1, g_statusString.c_str());
-		LeaveCriticalSection(&g_dialogLock);
-
-		InvalidateRect(g_hDlg, NULL, FALSE);
+		MessageBox(g_hWnd, szErrorMessage.c_str(), szTitle, g_uErrorDialogType);
 		PostMessage(g_hWnd, WM_CLOSE, 0, 0);
 	}
 
@@ -423,7 +403,6 @@ unsigned int __stdcall LaunchProgramThreadProc(void *pParam)
 
 	EnterCriticalSection(&g_dialogLock);
 	if (++g_context.nDiedThreadCount >= g_context.nThreadCount) {
-		g_statusString.append(_T("起動したすべてのプロセスが終了したため、プログラムを終了します。"));
 		PostMessage(g_hWnd, WM_CLOSE, 0, 0);
 	}
 	LeaveCriticalSection(&g_dialogLock);
