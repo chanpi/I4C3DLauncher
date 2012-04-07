@@ -96,7 +96,7 @@ BOOL Initialize(HWND hWnd)
 	PROCESS_INFORMATION pi = {0};
 	si.cb = sizeof(STARTUPINFO);
 	TCHAR szSplashWindow[BUFFER_SIZE] = {0};
-	_tcscpy_s(szSplashWindow, _countof(szSplashWindow), g_analyzer.GetGlobalValue(TAG_SPLASHWINDOW));
+	_tcscpy_s(szSplashWindow, _countof(szSplashWindow), g_analyzer.GetSoftValue(szTitle, TAG_SPLASHWINDOW));
 	if (szSplashWindow) {
 		CreateProcess(NULL, szSplashWindow, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
 	}
