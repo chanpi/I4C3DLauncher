@@ -131,9 +131,9 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	// メイン メッセージ ループ:
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
-		if (g_hDlg != NULL && IsDialogMessage(g_hDlg, &msg)) {
-			continue;
-		}
+		//if (g_hDlg != NULL && IsDialogMessage(g_hDlg, &msg)) {
+		//	continue;
+		//}
 
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
 		{
@@ -274,10 +274,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
-		g_hDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_DIALOG2), hWnd, (DLGPROC)DlgProc);
-		if (!g_noDialog) {
-			ShowWindow(g_hDlg, SW_SHOW);
-		}
+		//g_hDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_DIALOG2), hWnd, (DLGPROC)DlgProc);
+		//if (!g_noDialog) {
+		//	ShowWindow(g_hDlg, SW_SHOW);
+		//}
 		if (!Initialize(hWnd)) {
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			return 0;
@@ -331,13 +331,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case MY_NOTIFYICON:
 		switch (lParam) {
-		case WM_LBUTTONDBLCLK:
-			if (g_hDlg == NULL) {
-				g_hDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_DIALOG2), hWnd, (DLGPROC)DlgProc);
-			}
-			ShowWindow(g_hDlg, SW_SHOW);
-			SetForegroundWindow(g_hDlg);
-			break;
+		//case WM_LBUTTONDBLCLK:
+		//	if (g_hDlg == NULL) {
+		//		g_hDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_DIALOG2), hWnd, (DLGPROC)DlgProc);
+		//	}
+		//	ShowWindow(g_hDlg, SW_SHOW);
+		//	SetForegroundWindow(g_hDlg);
+		//	break;
 
 		case WM_RBUTTONDOWN:
 			SetTaskTrayIcon(hWnd);

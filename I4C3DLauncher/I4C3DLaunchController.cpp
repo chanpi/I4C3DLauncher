@@ -15,6 +15,7 @@ static LPCTSTR g_FILE = __FILE__;
 
 static VOID CreateErrorMessageMap(VOID);
 static VOID CloseProcess(LPCTSTR szApplicationName, HANDLE hProcess, DWORD dwProcessId);
+static VOID TerminateOtherLaucher();
 static VOID GetFileNameWithNoExtension(LPCTSTR szAppTitleWithExtension, LPTSTR szAppTitle, int length);
 
 // アプリケーションの起動に関する関数（ランチャー）
@@ -38,6 +39,7 @@ namespace {
 	const PCTSTR TAG_CORE_APP_NAME	= _T("core_app_name");
 	const PCTSTR TAG_RTTEC_MODE		= _T("rttec_mode");
 	const PCTSTR TAG_TIME_TO_WAIT	= _T("time_to_wait");
+	const PCTSTR TAG_SPLASHWINDOW	= _T("splashwindow");
 	const PCTSTR RTTEC_STRING		= _T("rttec");
 	const UINT g_uErrorDialogType = MB_OK | MB_ICONERROR | MB_TOPMOST;
 
@@ -89,6 +91,16 @@ BOOL Initialize(HWND hWnd)
 	}
 	g_context.pAnalyzer = &g_analyzer;
 
+	// スプラッシュウィンドウプログラムスタート
+	STARTUPINFO si = {0};
+	PROCESS_INFORMATION pi = {0};
+	si.cb = sizeof(STARTUPINFO);
+	TCHAR szSplashWindow[BUFFER_SIZE] = {0};
+	_tcscpy_s(szSplashWindow, _countof(szSplashWindow), g_analyzer.GetGlobalValue(TAG_SPLASHWINDOW));
+	if (szSplashWindow) {
+		CreateProcess(NULL, szSplashWindow, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
+	}
+
 	g_nTimeToWait = _tstoi(g_analyzer.GetSoftValue(szTitle, TAG_TIME_TO_WAIT));
 
 	// RTTECモードか確認
@@ -103,6 +115,9 @@ BOOL Initialize(HWND hWnd)
 		PostMessage(hWnd, WM_CLOSE, 0, 0);
 		return FALSE;
 	}
+
+	// 他のランチャーを終了(この機能はコアランチャーのみに必要です)
+	TerminateOtherLaucher();
 
 	// アプリケーションを起動
 	g_hLauchApplicationThread = (HANDLE)_beginthreadex(NULL, 0, LaunchApplicationsProc, NULL, 0, NULL);
@@ -128,11 +143,32 @@ VOID UnInitialize(VOID)
 	CloseHandle(g_hStopEvent);
 	g_hStopEvent = INVALID_HANDLE_VALUE;
 
-	if (g_hDlg) {
-		PostMessage(g_hDlg, WM_CLOSE, 0, 0);
-	}
+	//if (g_hDlg) {
+	//	PostMessage(g_hDlg, WM_CLOSE, 0, 0);
+	//}
 
 	// 他のランチャーを終了(この機能はコアランチャーのみに必要です)
+	TerminateOtherLaucher();
+	//if (g_bXMLFileError) {
+	//	return;
+	//}
+	//TCHAR szKey[32] = {0};
+	//LPCTSTR szTargetLauncher = NULL;
+	//HWND hLauncherWnd = NULL;
+	//for (int i = 1; i <= MAX_TARGET_COUNT; i++) {
+	//	_stprintf_s(szKey, _countof(szKey), _T("target_launcher%d"), i);
+	//	szTargetLauncher = g_analyzer.GetSoftValue(szTitle, szKey);	// 起動ファイル名取得
+	//	if (szTargetLauncher == NULL) {
+	//		//break;
+	//		continue;
+	//	}
+	//	hLauncherWnd = FindWindow(szTargetLauncher, NULL);
+	//	PostMessage(hLauncherWnd, WM_CLOSE, 0, 0);
+	//}	
+}
+
+VOID TerminateOtherLaucher(VOID)
+{
 	if (g_bXMLFileError) {
 		return;
 	}
