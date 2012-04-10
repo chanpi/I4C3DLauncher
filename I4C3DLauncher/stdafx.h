@@ -28,6 +28,6 @@ typedef std::basic_string<TCHAR> tstring;
 
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください。
 
-#include "Misc.h"
+#include "I4C3DLoadLibrary.h"
 #include "SharedConstants.h"
 #include "I4C3DCommon.h"

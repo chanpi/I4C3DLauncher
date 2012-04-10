@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-	BOOL Initialize(HWND hWnd);
+	BOOL Initialize(VOID);
 	VOID UnInitialize(VOID);
 	VOID ExitLauncher(VOID);
 

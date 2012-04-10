@@ -57,8 +57,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\..\I4C3DDriver\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>XMLParser.lib;Misc.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -77,19 +77,19 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(SolutionDir)\..\I4C3DDriver\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>XMLParser.lib;Misc.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="hamster.bmp" />
-    <None Include="hamster.png" />
+    <None Include="Hamster.ico" />
     <None Include="I4C3DLauncher.ico" />
     <None Include="ReadMe.txt" />
     <None Include="small.ico" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnalyzeXML.h" />
+    <ClInclude Include="I4C3DLoadLibrary.h" />
     <ClInclude Include="SharedConstants.h" />
     <ClInclude Include="I4C3DLaunchController.h" />
     <ClInclude Include="I4C3DLauncher.h" />
@@ -101,6 +101,7 @@
     <ClCompile Include="AnalyzeXML.cpp" />
     <ClCompile Include="I4C3DLaunchController.cpp" />
     <ClCompile Include="I4C3DLauncher.cpp" />
+    <ClCompile Include="I4C3DLoadLibrary.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

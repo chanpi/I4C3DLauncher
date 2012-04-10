@@ -53,6 +53,7 @@
 #define MESSAGE_ERROR_XML_TAG_SOFTS_DOM	"XMLファイルのsoftsタグのDOM取得に失敗しました。XMLの構文が正しいか確認してください。"
 
 #define MESSAGE_ERROR_SYSTEM_INIT		"システムの初期化に失敗しました。システムの設定が正しいか確認してください。"
+#define MESSAGE_ERROR_FUNCTION_PARAM	"引数に誤りがあります。"
 
 #define MESSAGE_ERROR_CFG_COREAPPNAME	"設定ファイルのcore_app_nameタグにコアアプリケーション名を記載してください。"
 #define MESSAGE_ERROR_CFG_TERMCHAR		"設定ファイルの終端文字の指定が間違っています。'?' を設定します。"

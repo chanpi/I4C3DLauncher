@@ -22,10 +22,7 @@
     <None Include="I4C3DLauncher.ico">
       <Filter>リソース ファイル</Filter>
     </None>
-    <None Include="hamster.png">
-      <Filter>リソース ファイル</Filter>
-    </None>
-    <None Include="hamster.bmp">
+    <None Include="Hamster.ico">
       <Filter>リソース ファイル</Filter>
     </None>
   </ItemGroup>
@@ -51,6 +48,9 @@
     <ClInclude Include="SharedConstants.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="I4C3DLoadLibrary.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -63,6 +63,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="I4C3DLaunchController.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="I4C3DLoadLibrary.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

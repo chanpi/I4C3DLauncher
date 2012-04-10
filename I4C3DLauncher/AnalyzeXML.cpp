@@ -1,7 +1,6 @@
 #include "StdAfx.h"
 #include "I4C3DLauncher.h"
 #include "AnalyzeXML.h"
-#include "XMLParser.h"
 #include <vector>
 
 #if UNICODE || _UNICODE
@@ -11,12 +10,13 @@ static LPCTSTR g_FILE = __FILE__;
 #endif
 
 extern TCHAR szTitle[];
+static I4C3DLoadLibrary* g_pLoadLibrary				= NULL;
 
-static IXMLDOMElement* g_pRootElement = NULL;
-static BOOL g_bInitialized = FALSE;
-static map<PCTSTR, PCTSTR>* g_pGlobalConfig		= NULL;
+static IXMLDOMElement* g_pRootElement				= NULL;
+static BOOL g_bInitialized							= FALSE;
+static map<PCTSTR, PCTSTR>* g_pGlobalConfig			= NULL;
 typedef pair<PCTSTR, map<PCTSTR, PCTSTR>*> config_pair;
-static vector<config_pair>* g_pConfigPairContainer;
+static vector<config_pair>* g_pConfigPairContainer	= NULL;
 
 static void CleanupRootElement(void);
 
@@ -27,13 +27,14 @@ static const PCTSTR TAG_NAME		= _T("name");
 inline void SafeReleaseMap(map<PCTSTR, PCTSTR>* pMap)
 {
 	if (pMap != NULL) {
-		CleanupStoredValues(pMap);
+		g_pLoadLibrary->LPFNCleanupStoredValues(pMap);
 		pMap = NULL;
 	}
 }
 
-AnalyzeXML::AnalyzeXML(void)
+AnalyzeXML::AnalyzeXML(I4C3DLoadLibrary* pLoadLibrary)
 {
+	g_pLoadLibrary = pLoadLibrary;
 	g_pConfigPairContainer = new vector<config_pair>;
 }
 
@@ -74,7 +75,7 @@ void CleanupRootElement(void)
 		SafeReleaseMap(g_pGlobalConfig);
 		g_pGlobalConfig		= NULL;
 
-		UnInitialize(g_pRootElement);
+		g_pLoadLibrary->LPFNUnInitialize(g_pRootElement);
 		g_pRootElement = NULL;
 		g_bInitialized = FALSE;
 	}
@@ -96,12 +97,12 @@ BOOL AnalyzeXML::LoadXML(PCTSTR szXMLUri, BOOL* bFileExist)
 {
 	CleanupRootElement();
 	if (!PathFileExists(szXMLUri)) {
-		LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_LOAD), GetLastError(), g_FILE, __LINE__);
+		g_pLoadLibrary->LPFNLoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_LOAD), GetLastError(), g_FILE, __LINE__);
 		*bFileExist = FALSE;
 		return FALSE;
 	}
 	*bFileExist = TRUE;
-	g_bInitialized = Initialize(&g_pRootElement, szXMLUri);
+	g_bInitialized = g_pLoadLibrary->LPFNInitialize(&g_pRootElement, szXMLUri);
 	return g_bInitialized;
 }
 
@@ -123,11 +124,11 @@ BOOL AnalyzeXML::LoadXML(PCTSTR szXMLUri, BOOL* bFileExist)
 PCTSTR AnalyzeXML::GetGlobalValue(PCTSTR szKey)
 {
 	if (!ReadGlobalTag()) {
-		LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_GLOBAL), GetLastError(), g_FILE, __LINE__);
+		g_pLoadLibrary->LPFNLoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_GLOBAL), GetLastError(), g_FILE, __LINE__);
 		return NULL;
 	}
 
-	return GetMapItem(g_pGlobalConfig, szKey);
+	return g_pLoadLibrary->LPFNGetMapItem(g_pGlobalConfig, szKey);
 }
 
 /**
@@ -152,7 +153,7 @@ PCTSTR AnalyzeXML::GetSoftValue(PCTSTR szSoftName, PCTSTR szKey)
 	//	return NULL;
 	//}
 	if (!this->ReadSoftsTag()) {
-		LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_SOFTS), GetLastError(), g_FILE, __LINE__);
+		g_pLoadLibrary->LPFNLoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_SOFTS), GetLastError(), g_FILE, __LINE__);
 		return NULL;
 	}
 
@@ -160,7 +161,7 @@ PCTSTR AnalyzeXML::GetSoftValue(PCTSTR szSoftName, PCTSTR szKey)
 		int size = g_pConfigPairContainer->size();
 		for (int i = 0; i < size; ++i) {
 			if (_tcsicmp((*g_pConfigPairContainer)[i].first, szSoftName) == 0) {
-				return GetMapItem((*g_pConfigPairContainer)[i].second, szKey);
+				return g_pLoadLibrary->LPFNGetMapItem((*g_pConfigPairContainer)[i].second, szKey);
 			}
 		}
 	}
@@ -188,9 +189,9 @@ BOOL AnalyzeXML::ReadGlobalTag(void)
 {
 	if (g_pGlobalConfig == NULL) {
 		IXMLDOMNode* pGlobal = NULL;
-		if (GetDOMTree(g_pRootElement, TAG_GLOBAL, &pGlobal)) {
-			g_pGlobalConfig = StoreValues(pGlobal, TAG_NAME);
-			FreeDOMTree(pGlobal);
+		if (g_pLoadLibrary->LPFNGetDOMTree(g_pRootElement, TAG_GLOBAL, &pGlobal)) {
+			g_pGlobalConfig = g_pLoadLibrary->LPFNStoreValues(pGlobal, TAG_NAME);
+			g_pLoadLibrary->LPFNFreeDOMTree(pGlobal);
 
 		} else {
 			return FALSE;
@@ -216,35 +217,36 @@ BOOL AnalyzeXML::ReadGlobalTag(void)
  */
 BOOL AnalyzeXML::ReadSoftsTag(void)
 {
-	if (g_pConfigPairContainer->size() == 0) {
+	if (g_pConfigPairContainer->empty()) {
 
 		IXMLDOMNode* pSofts = NULL;
 		IXMLDOMNodeList* pSoftsList = NULL;
-		if (!GetDOMTree(g_pRootElement, TAG_SOFTS, &pSofts)) {
-			LoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_SOFTS_DOM), GetLastError(), g_FILE, __LINE__);
+		if (!g_pLoadLibrary->LPFNGetDOMTree(g_pRootElement, TAG_SOFTS, &pSofts)) {
+			g_pLoadLibrary->LPFNLoggingMessage(Log_Error, _T(MESSAGE_ERROR_XML_TAG_SOFTS_DOM), GetLastError(), g_FILE, __LINE__);
 			return FALSE;
 		}
 
-		LONG childCount = GetChildList(pSofts, &pSoftsList);
+		LONG childCount = g_pLoadLibrary->LPFNGetChildList(pSofts, &pSoftsList);
 		for (int i = 0; i < childCount; i++) {
 			IXMLDOMNode* pTempNode = NULL;
-			if (GetListItem(pSoftsList, i, &pTempNode)) {
+			if (g_pLoadLibrary->LPFNGetListItem(pSoftsList, i, &pTempNode)) {
 				TCHAR szSoftwareName[BUFFER_SIZE] = {0};
-				if (GetAttribute(pTempNode, TAG_NAME, szSoftwareName, _countof(szSoftwareName))) {
+				if (g_pLoadLibrary->LPFNGetAttribute(pTempNode, TAG_NAME, szSoftwareName, _countof(szSoftwareName))) {
 
 					// globalタグのターゲット名と比較
-					TCHAR* pSoftwareName = new TCHAR[_tcslen(szSoftwareName)+1];
+					TCHAR* pSoftwareName = new TCHAR[_tcslen(szSoftwareName)+1];	// CleanupRootElement()でdelete
+					ZeroMemory(pSoftwareName, sizeof(pSoftwareName));
 					_tcscpy_s(pSoftwareName, _tcslen(szSoftwareName)+1, szSoftwareName);
-					g_pConfigPairContainer->push_back(config_pair(pSoftwareName, StoreValues(pTempNode, TAG_NAME)));
+					g_pConfigPairContainer->push_back(config_pair(pSoftwareName, g_pLoadLibrary->LPFNStoreValues(pTempNode, TAG_NAME)));
 					OutputDebugString(szSoftwareName);
 					OutputDebugString(_T(" push_back\n"));
 				}
-				FreeListItem(pTempNode);
+				g_pLoadLibrary->LPFNFreeListItem(pTempNode);
 			}
 		}
 
-		FreeChildList(pSoftsList);
-		FreeDOMTree(pSofts);
+		g_pLoadLibrary->LPFNFreeChildList(pSoftsList);
+		g_pLoadLibrary->LPFNFreeDOMTree(pSofts);
 	}
 	return TRUE;
 }

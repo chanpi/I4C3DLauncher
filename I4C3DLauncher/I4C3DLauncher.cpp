@@ -47,14 +47,11 @@ namespace {
 	HICON g_hMiniIcon = NULL;
 	typedef enum { EDIT_MENU, RELOAD_MENU, EXIT_MENU } MENU_ITEMS;
 
-	// 稼動時にログダイアログを表示する
-	static BOOL g_noDialog = FALSE;
-
-	static LPCTSTR g_szNoDialogOption	= _T("-nodialog");
+	const UINT g_uErrorDialogType = MB_OK | MB_ICONERROR | MB_TOPMOST;
 }
 
 I4C3DLauncherContext g_context = {0};
-AnalyzeXML g_analyzer;
+I4C3DLoadLibrary g_loadLibrary;
 
 // 排他制御、プログラム実行の制御に使用
 CRITICAL_SECTION g_lock;
@@ -78,7 +75,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 #if DEBUG || _DEBUG
 	_CrtSetDbgFlag( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
-	
+
 	// TODO: ここにコードを挿入してください。
 	MSG msg;
 	HACCEL hAccelTable;
@@ -87,21 +84,19 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadString(hInstance, IDC_LAUNCHER, szWindowClass, MAX_LOADSTRING);
 
-	if (!ExecuteOnce(szTitle)) {
+	if (!g_loadLibrary.LoadLibraries()) {
+		TCHAR szMessage[BUFFER_SIZE];
+		LoadString(hInst, IDS_LOADLIBRARY_FAILED, szMessage, _countof(szMessage));
+		MessageBox(NULL, szMessage, szTitle, g_uErrorDialogType);
+		return EXIT_FAILURE;
+	}
+
+	if (!g_loadLibrary.LPFNExecuteOnce(szTitle)) {
+		g_loadLibrary.FreeLibraries();
 		return EXIT_SUCCESS;
 	}
 
 	MyRegisterClass(hInstance);
-
-	int argc = 0;
-	LPTSTR *argv = NULL;
-	argv = CommandLineToArgvW(GetCommandLine(), &argc);
-	if (argc > 1) {
-		if (0 == _tcsicmp(argv[1], g_szNoDialogOption)) {
-			g_noDialog = TRUE;
-		}
-	}
-	LocalFree(argv);
 
 	LOG_LEVEL logLevel = Log_Error;
 #if _DEBUG || DEBUG
@@ -109,7 +104,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 #else
 	logLevel = Log_Error;
 #endif
-	if (!LogFileOpenW(SHARED_LOG_FILE_NAME, logLevel)) {
+	if (!g_loadLibrary.LPFNLogFileOpenW(SHARED_LOG_FILE_DIRECTORY_OF_LAUNCHER, SHARED_LOG_FILE_NAME, logLevel)) {
 	}
 
 	// クリティカルセクションの初期化
@@ -121,8 +116,10 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	{
 		DeleteCriticalSection(&g_lock);
 		DeleteCriticalSection(&g_dialogLock);
-		CleanupMutex();
-		LogFileCloseW();
+		g_loadLibrary.LPFNCleanupMutex();
+		g_loadLibrary.LPFNLogFileCloseW();
+
+		g_loadLibrary.FreeLibraries();
 		return FALSE;
 	}
 
@@ -146,15 +143,17 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	DeleteCriticalSection(&g_lock);
 	DeleteCriticalSection(&g_dialogLock);
 
-	CleanupMutex();
-	LogFileCloseW();
+	g_loadLibrary.LPFNCleanupMutex();
+	g_loadLibrary.LPFNLogFileCloseW();
+
+	g_loadLibrary.FreeLibraries();
 	return (int) msg.wParam;
 }
 
 inline void SetTaskTrayIcon(HWND hWnd) {
 	HMENU hMenu = NULL;
 	MENUITEMINFO menuItem_edit, menuItem_reload, menuItem_exit;
-	POINT pos;
+	POINT pos = {0};
 	ZeroMemory(&menuItem_edit, sizeof(menuItem_edit));
 	ZeroMemory(&menuItem_reload, sizeof(menuItem_reload));
 	ZeroMemory(&menuItem_exit, sizeof(menuItem_exit));
@@ -274,18 +273,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
-		//g_hDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_DIALOG2), hWnd, (DLGPROC)DlgProc);
-		//if (!g_noDialog) {
-		//	ShowWindow(g_hDlg, SW_SHOW);
-		//}
-		if (!Initialize(hWnd)) {
+		if (!Initialize()) {
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			return 0;
 		}
 
 		// モジュール名を取得（）
 		if (!GetModuleFileName(NULL, szFileName, _countof(szFileName))) {
-			LoggingMessage(Log_Error, _T(MESSAGE_ERROR_SYSTEM_INIT), GetLastError(), g_FILE, __LINE__);
+			g_loadLibrary.LPFNLoggingMessage(Log_Error, _T(MESSAGE_ERROR_SYSTEM_INIT), GetLastError(), g_FILE, __LINE__);
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			return 0;
 		}
@@ -387,7 +382,7 @@ LRESULT CALLBACK DlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
 
-	HICON hIcon;
+	HICON hIcon = NULL;
 	switch (message)
 	{
 	case WM_INITDIALOG:
@@ -435,7 +430,7 @@ LRESULT CALLBACK DlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 LRESULT CALLBACK DlgProc2(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
-	HICON hIcon;
+	HICON hIcon = NULL;
 
 	switch (message)
 	{

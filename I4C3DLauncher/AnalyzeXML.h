@@ -1,10 +1,11 @@
 #pragma once
 #include <map>
+class I4C3DLoadLibrary;
 
 class AnalyzeXML
 {
 public:
-	AnalyzeXML(void);
+	AnalyzeXML(I4C3DLoadLibrary* pLoadLibrary);
 	~AnalyzeXML(void);
 
 	// 引数つきコンストラクタを呼ばない場合は、別途呼び出すことができます。
